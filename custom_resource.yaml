@@ -1,0 +1,79 @@
+Parameters:
+  S3BucketName:
+    Type: String
+    Default: ttngmys3bktname
+
+
+Resources:
+  MyCustomResource:
+    Type: Custom::MyCustomResource
+    Properties:
+      ServiceToken: !GetAtt NewS3Bucket.Arn
+      StackName: !Ref AWS::StackName
+
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:*
+            Resource: arn:aws:logs:*:*:*
+
+  NewS3Bucket:
+    Type: AWS::Lambda::Function
+    Description: Creates a S3 bucket and tags it with the stack name.
+    Properties:
+      Handler: "index.lambda_handler"
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 15
+      Runtime: python3.6
+      Code:
+        ZipFile: |
+          import boto3
+          import cfnresponse
+          import logging
+          LOGGER = logging.getLogger()
+          LOGGER.setLevel(logging.INFO)
+
+          def lambda_handler(event, context):
+              responseData = {}
+              physicalResourceId = {}
+
+              if event['RequestType'] == 'Delete':
+                  LOGGER.info('Delete REQUEST RECEIVED:\n %s', event)
+                  try:
+                      # Do something here
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, physicalResourceId )
+                      return
+                    
+                  except Exception:
+                      LOGGER.info('Delete request failed:\n %s', event)
+                      cfnresponse.send(event, context, cfnresponse.FAILED, responseData, physicalResourceId )
+                      return
+
+              if event['RequestType'] == 'Create':
+                   LOGGER.info('Create REQUEST RECEIVED:\n %s', event)
+                   try:
+                      # Do something here
+                      cfnresponse.send(event, context, cfnresponse.SUCCESS, responseData, physicalResourceId )
+                      return
+
+                   except Exception:
+                      LOGGER.info('Failed to create')
+                      cfnresponse.send(event, context, cfnresponse.FAILED, responseData, physicalResourceId )
+                      return
