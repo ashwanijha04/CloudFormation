@@ -1,8 +1,6 @@
 Parameters:
   S3BucketName:
     Type: String
-    Default: ttngmys3bktname
-
 
 Resources:
   MyCustomResource:
