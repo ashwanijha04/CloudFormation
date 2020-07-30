@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: SAM function
+Resources:
+  GetCanaryHealth:
+     Type: AWS::Serverless::Function
+     Properties:
+       Handler: index.lambda_handler
+       Runtime: python3.7
+       Timeout: 30
+       MemorySize: 128
+       Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Action: '*'
+              Resource: '*'
+       ReservedConcurrentExecutions: 5 
+       AutoPublishAlias: live 
+       DeploymentPreference:
+         Type: Canary10Percent5Minutes # AllAtOnce Or Canary10Percent5Minutes, Linear10PercentEvery1Minute, ...
+         Alarms:
+           - !Ref GetCanaryHealthAliasErrorAlarm
+           - !Ref GetCanaryHealthLatestVersionErrorAlarm
+         Enabled: True
+       InlineCode: |
+         import boto3
+         import json
+         import logging
+
+         logger = logging.getLogger()
+         logger.setLevel(logging.INFO)
+
+         def lambda_handler(event, context):
+             logger.info('event = ' + str(event))
+             logger.debug('context = ' + str(context))
+
+             # Force a failure so we trigger the alarm state deliberately
+             raise Exception('Expected failure to trigger alarm state')
+
+  GetCanaryHealthAliasErrorAlarm:
+      Type: "AWS::CloudWatch::Alarm"
+      Properties:
+        ActionsEnabled: true
+        AlarmDescription: Lambda Function Error > 0
+        AlarmName: health-alias-errors-alarm
+        ComparisonOperator: GreaterThanThreshold
+        Dimensions:
+          - Name: Resource
+            Value: !Sub "${GetCanaryHealth}:live"
+          - Name: FunctionName
+            Value: !Ref GetCanaryHealth
+        EvaluationPeriods: 1
+        MetricName: Errors
+        Namespace: AWS/Lambda
+        # This period needs to be the same as the DeploymentPreferenceType duration for Canary in seconds
+        Period: 300
+        Statistic: Maximum
+        Threshold: 0
+        TreatMissingData: missing
+
+
+  GetCanaryHealthLatestVersionErrorAlarm:
+     Type: "AWS::CloudWatch::Alarm"
+     Properties:
+       ActionsEnabled: true
+       AlarmDescription: Lambda Function Error > 0
+       AlarmName: health-latest-version-errors-alarm
+       ComparisonOperator: GreaterThanThreshold
+       Dimensions:
+         - Name: Resource
+           Value: !Sub "${GetCanaryHealth}:live"
+         - Name: FunctionName
+           Value: !Ref GetCanaryHealth
+       EvaluationPeriods: 1
+       MetricName: Errors
+       Namespace: AWS/Lambda
+       # This period needs to be the same as the DeploymentPreferenceType duration for Canary in seconds
+       Period: 300
+       Statistic: Maximum
+       Threshold: 0
+       TreatMissingData: missing
