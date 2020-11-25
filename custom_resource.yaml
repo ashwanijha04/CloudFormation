@@ -1,6 +1,7 @@
 Parameters:
   S3BucketName:
     Type: String
+    Default: ARandomBucket_very_random_string
 
 Resources:
   MyCustomResource:
